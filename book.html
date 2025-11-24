@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>答案之书 - The Book of Answers</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+
+        :root {
+            --book-width: 300px;
+            --book-height: 420px;
+            --book-depth: 40px;
+            --cover-color: #1a1a2e;
+            --page-color: #fdfbf7;
+            --gold-color: #d4af37;
+        }
+
+        body {
+            background-color: #0f0f13;
+            background-image: radial-gradient(circle at 50% 50%, #16213e 0%, #0f0f13 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            font-family: 'Noto Serif SC', serif;
+            overflow: hidden;
+            perspective: 1500px; /* 3D透视 */
+        }
+
+        /* 场景容器 */
+        .scene {
+            position: relative;
+            width: var(--book-width);
+            height: var(--book-height);
+        }
+
+        /* 书本主体 */
+        .book {
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.645, 0.045, 0.355, 1);
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* 翻书状态 */
+        .book.is-open {
+            transform: rotateY(-180deg) translateX(50%);
+        }
+        
+        /* 针对移动端的调整 */
+        @media (max-width: 600px) {
+            .book.is-open {
+                transform: rotateY(-180deg); /* 移动端不平移，直接翻转 */
+            }
+        }
+
+        /* 通用页面样式 */
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            backface-visibility: hidden; /* 背面不可见 */
+            border-radius: 5px 15px 15px 5px;
+        }
+
+        /* === 封面 (Front) === */
+        .front {
+            background: var(--cover-color);
+            color: var(--gold-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #2a2a40;
+            z-index: 2;
+            /* 皮革纹理模拟 */
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+        }
+
+        /* 书脊装饰线 */
+        .front::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: rgba(212, 175, 55, 0.3);
+        }
+
+        .title-box {
+            border: 3px double var(--gold-color);
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 5px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            opacity: 0.8;
+        }
+
+        /* 输入区域 */
+        .input-group {
+            width: 80%;
+            position: relative;
+            text-align: center;
+        }
+
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--gold-color);
+            color: #fff;
+            width: 100%;
+            padding: 10px;
+            font-family: 'Noto Serif SC', serif;
+            font-size: 1rem;
+            text-align: center;
+            outline: none;
+        }
+
+        input::placeholder {
+            color: rgba(212, 175, 55, 0.5);
+            font-style: italic;
+        }
+
+        .hint {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .btn-ask {
+            margin-top: 30px;
+            background: transparent;
+            border: 1px solid var(--gold-color);
+            color: var(--gold-color);
+            padding: 8px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .btn-ask:hover {
+            background: var(--gold-color);
+            color: var(--cover-color);
+            box-shadow: 0 0 15px var(--gold-color);
+        }
+
+        /* === 内页/背面 (Back) === */
+        .back {
+            background: var(--page-color);
+            color: #333;
+            transform: rotateY(180deg);
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            box-sizing: border-box;
+            text-align: center;
+            box-shadow: inset 10px 0 30px rgba(0,0,0,0.1); /* 书页阴影 */
+        }
+
+        .answer-container {
+            opacity: 0;
+            transition: opacity 1s ease 0.5s; /* 延迟显示文字 */
+        }
+
+        .show-answer .answer-container {
+            opacity: 1;
+        }
+
+        .answer-text {
+            font-size: 2rem;
+            font-weight: bold;
+            line-height: 1.4;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+
+        .answer-id {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 10px;
+            font-family: sans-serif;
+        }
+
+        .btn-reset {
+            border: none;
+            background: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-bottom: 1px solid transparent;
+            transition: 0.3s;
+        }
+
+        .btn-reset:hover {
+            color: #000;
+            border-bottom: 1px solid #000;
+        }
+
+        /* 侧面厚度 (可选，增强3D感) */
+        .book-side {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            width: var(--book-depth);
+            background: #ccc;
+            transform: rotateY(90deg) translateZ(calc(var(--book-depth) / 2));
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="scene">
+    <div class="book" id="theBook">
+        <div class="face front">
+            <div class="title-box">
+                <h1>答案<br>之书</h1>
+                <div class="subtitle">The Book of Answers</div>
+            </div>
+            
+            <div class="input-group">
+                <input type="text" id="userQuestion" placeholder="在此默念你的问题..." autocomplete="off">
+                <button class="btn-ask" id="askBtn">翻开寻找答案</button>
+            </div>
+            <div class="hint">只有真心提问，<br>宇宙才会回应。</div>
+        </div>
+
+        <div class="face back">
+            <div class="answer-container" id="answerContainer">
+                <div class="answer-id" id="answerId">NO.00</div>
+                <div class="answer-text" id="answerText">等待中...</div>
+                <button class="btn-reset" id="resetBtn">再问一次</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 数据准备
+    const answers = [
+        "只想不努力是没用的!!加油…。", "非常冒险...机会不大。", "接受別人的意见会有助力。",
+        "办何自己不肯妥协，先问一下自已的能力。", "毫无疑问。", "仍然难以估计。", "绝对不可。",
+        "耐心等待。", "办何你还相信自己的幻想。", "不要表态。", "可能会造成震惊事件。",
+        "答案不是你所想但又会成功。", "你需要尝试接受。", "太疑神疑鬼了、加强自信吧。",
+        "是你心思误放在其它地方，影响运程。", "别心急。", "很大机会出现另一局面。", "静观其变。",
+        "现在不是最佳时机。", "保持警愓、並非如你所想。", "听一下別人劝告吧。", "现在没法要求太多。",
+        "用轻松的态度面对。", "事與願違，须多留意自己情绪。", "要节制了，记得见好就收。",
+        "不在你控制范围以内。", "小心!!", "继续走你的路，问題当没有事情发生过吧。",
+        "用感觉去行动吧。", "别被自己情绪影响。", "好好把握啦 !", "可按自己的目标进行计划。",
+        "转移目标吧。", "多留意身边事物、另有出路。", "凡事都有两面，一时不爽未必是壞事。",
+        "不妨改变一下想法。", "重新想一下是否真正对你最重要吧。", "记得不要太急进。",
+        "别再浪费时间。", "辛苦的付出与收获不成正比，但切忌意气用事。", "结果如何你都不会忘记这件事。",
+        "问题将会解决。", "将会受到一些挫折，要积极面对。", "有意外困扰，停滞不前，情绪会受到动摇。",
+        "不要心存侥幸，不付出又那会有收获呢 ?", "出现了最佳时机，记着要踏实去干。",
+        "危机四伏，较为冲击动荡，需要过关斩将。", "尝试去想一下其它更多的可能性。", "迟一点才去解决。",
+        "不要自钻牛角尖，包容较挑剔来得开心。", "小心外来的引诱，不要意气用事啊 !",
+        "接受改变，面对现实啦。", "困扰你的问题可望得到解决。", "机会不会短期内再出现。",
+        "再想清楚你要的是什么。", "等待一个更好机会。", "你需要付出代价。",
+        "无论如何你都会继續去做 !", "你需要放弃其它东西才成事。", "可能会好难﹐但值得的。"
+    ];
+
+    const book = document.getElementById('theBook');
+    const askBtn = document.getElementById('askBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const input = document.getElementById('userQuestion');
+    const answerText = document.getElementById('answerText');
+    const answerId = document.getElementById('answerId');
+    const backPage = document.querySelector('.back');
+
+    // 2. 神秘计算公式
+    function getMysteriousAnswer(question) {
+        const now = new Date();
+        
+        // 因子A: 当前时间的总毫秒数 (保证每一刻都不同)
+        const timeFactor = now.getTime(); 
+        
+        // 因子B: 问题的“重量” (所有字符的Unicode码之和)
+        let questionWeight = 0;
+        if(question && question.length > 0) {
+            for (let i = 0; i < question.length; i++) {
+                questionWeight += question.charCodeAt(i);
+            }
+        } else {
+            // 如果用户没填，就用随机数补位，或者强制默念
+            questionWeight = Math.floor(Math.random() * 1000);
+        }
+
+        // 核心公式: (时间 + 问题重量) % 答案总数
+        // 这个算法保证了，哪怕同一秒钟，如果不改变问题，答案是一样的(宿命感)
+        // 但如果时间流逝哪怕一毫秒，答案就会变(无常感)
+        const index = (timeFactor + questionWeight) % answers.length;
+        
+        return {
+            index: index,
+            text: answers[index]
+        };
+    }
+
+    // 3. 交互逻辑
+    askBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // 防止冒泡
+        
+        const val = input.value.trim();
+        if(!val) {
+            input.placeholder = "请先在心中默念问题...";
+            input.focus();
+            return;
+        }
+
+        // 获取答案
+        const result = getMysteriousAnswer(val);
+
+        // 渲染内容
+        // 格式化ID，小于10补0
+        const idStr = result.index < 10 ? '0' + result.index : result.index;
+        answerId.innerText = `【${idStr}】`;
+        answerText.innerText = result.text;
+
+        // 触发翻书动画
+        book.classList.add('is-open');
+        
+        // 延迟显示文字，制造“浮现”的效果
+        setTimeout(() => {
+            backPage.classList.add('show-answer');
+        }, 300);
+    });
+
+    // 重置/合上书本
+    resetBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeBook();
+    });
+
+    // 点击书本空白处也可以合上
+    // book.addEventListener('click', function() {
+    //    if(book.classList.contains('is-open')) {
+    //        closeBook();
+    //    }
+    // });
+
+    function closeBook() {
+        backPage.classList.remove('show-answer');
+        setTimeout(() => {
+            book.classList.remove('is-open');
+            input.value = ""; // 清空问题
+            input.placeholder = "在此默念你的问题...";
+        }, 200); // 文字消失后再合上
+    }
+
+    // 支持回车键提问
+    input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            askBtn.click();
+        }
+    });
+
+</script>
+
+</body>
+</html>
